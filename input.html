@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Data Input</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="file"],
+        textarea,
+        select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 25px;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #statusMessage, #imageUploadStatus {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.95em;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        .image-preview-container {
+            margin-top: 10px;
+            text-align: center;
+        }
+        .image-preview-container img {
+            max-width: 100%;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>उत्पाद डेटा इनपुट करें</h1>
+        <form id="productForm">
+            <div>
+                <label for="productName">उत्पाद का नाम (Product Name):</label>
+                <input type="text" id="productName" name="productName" required>
+            </div>
+            <div>
+                <label for="emi">ईएमआई (EMI):</label>
+                <input type="number" id="emi" name="emi" step="any">
+            </div>
+            <div>
+                <label for="productDescription">उत्पाद विवरण (Product Description):</label>
+                <textarea id="productDescription" name="productDescription" required></textarea>
+            </div>
+            <div>
+                <label for="category">श्रेणी (Category):</label>
+                <input type="text" id="category" name="category" required>
+            </div>
+            <div>
+                <label for="productImage">उत्पाद छवि (Product Image):</label>
+                <input type="file" id="productImage" name="productImage" accept="image/*">
+                <div class="image-preview-container" id="imagePreviewContainer" style="display:none;">
+                    <img id="imagePreview" src="#" alt="Image Preview"/>
+                </div>
+            </div>
+            <div id="imageUploadStatus"></div>
+            <button type="submit" id="submitButton">डेटा सहेजें (Save Data)</button>
+        </form>
+        <div id="statusMessage"></div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const IMGBB_API_KEY = 'a08956dace616cbc26f1a9bd67e5a5eb';
+        // Aapka Google Apps Script Web App URL
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxBv_EFE7txJP1nPh4Iql3tBeFTyppthWBUK9-L6RRbNntsHyRoi4FrpQrZG8JHsvVH5Q/exec';
+
+        const productForm = document.getElementById('productForm');
+        const statusMessage = document.getElementById('statusMessage');
+        const imageUploadStatus = document.getElementById('imageUploadStatus');
+        const submitButton = document.getElementById('submitButton');
+        const productImageInput = document.getElementById('productImage');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+
+        if (!IMGBB_API_KEY) {
+             alert('IMGBB_API_KEY sahi se configure nahi hai.');
+        }
+        if (!WEB_APP_URL) {
+             alert('WEB_APP_URL HTML code mein set nahi hai.');
+        }
+
+        productImageInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.setAttribute('src', e.target.result);
+                    imagePreviewContainer.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            } else {
+                imagePreviewContainer.style.display = 'none';
+                imagePreview.setAttribute('src', '#');
+            }
+        });
+
+        productForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            statusMessage.textContent = '';
+            statusMessage.className = '';
+            imageUploadStatus.textContent = '';
+            imageUploadStatus.className = '';
+            submitButton.disabled = true;
+            submitButton.innerHTML = 'Processing... <svg width="20" height="20" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid" style="display: inline-block; vertical-align: middle;"><circle cx="50" cy="50" r="30" stroke="#fff" stroke-width="10" fill="none" stroke-dasharray="47.12388980384689 47.12388980384689" transform="rotate(240 50 50)"><animateTransform attributeName="transform" type="rotate" repeatCount="indefinite" dur="1s" values="0 50 50;360 50 50" keyTimes="0;1"></animateTransform></circle></svg>';
+
+            let pictureUrl = "";
+            const imageFile = productImageInput.files[0];
+
+            if (imageFile) {
+                imageUploadStatus.textContent = 'छवि अपलोड हो रही है...';
+                imageUploadStatus.className = 'info';
+                const formData = new FormData();
+                formData.append('key', IMGBB_API_KEY);
+                formData.append('image', imageFile);
+
+                try {
+                    const imgbbResponse = await fetch('https://api.imgbb.com/1/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const imgbbResult = await imgbbResponse.json();
+
+                    if (imgbbResult.success && imgbbResult.data && imgbbResult.data.url) {
+                        pictureUrl = imgbbResult.data.url;
+                        imageUploadStatus.textContent = 'छवि सफलतापूर्वक अपलोड हुई!';
+                        imageUploadStatus.className = 'success';
+                    } else {
+                        console.error('ImgBB API Error:', imgbbResult);
+                        imageUploadStatus.textContent = 'ImgBB पर छवि अपलोड करने में त्रुटि: ' + (imgbbResult.error?.message || 'Unknown error');
+                        imageUploadStatus.className = 'error';
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'डेटा सहेजें (Save Data)';
+                        return; 
+                    }
+                } catch (error) {
+                    console.error('Error uploading to ImgBB:', error);
+                    imageUploadStatus.textContent = 'ImgBB पर छवि अपलोड करने में त्रुटि: ' + error.message;
+                    imageUploadStatus.className = 'error';
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'डेटा सहेजें (Save Data)';
+                    return; 
+                }
+            } else {
+                 imageUploadStatus.textContent = 'कोई छवि चयनित नहीं है।';
+                 imageUploadStatus.className = 'info';
+            }
+
+            statusMessage.textContent = 'Google Sheet में डेटा सहेजा जा रहा है...';
+            statusMessage.className = 'info';
+
+            const productNameValue = document.getElementById('productName').value;
+            const emiValue = document.getElementById('emi').value;
+            const productDescriptionValue = document.getElementById('productDescription').value;
+            const categoryValue = document.getElementById('category').value;
+
+            const dataToSend = {
+                "product name": productNameValue,
+                "EMI": emiValue ? parseFloat(emiValue) : null,
+                "product description": productDescriptionValue,
+                "category": categoryValue,
+                "picture link": pictureUrl
+            };
+
+            try {
+                // Ab fetch request aapke diye gaye WEB_APP_URL par jayegi
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'cors', 
+                    cache: 'no-cache',
+                    body: JSON.stringify(dataToSend)
+                });
+
+                const resultText = await response.text();
+                let result;
+                 try {
+                    result = JSON.parse(resultText);
+                } catch (parseError) {
+                    console.error('Error parsing JSON response from Google Script:', resultText);
+                    statusMessage.textContent = 'Google Script से अपठनीय प्रतिक्रिया मिली: ' + resultText.substring(0,100);
+                    statusMessage.className = 'error';
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'डेटा सहेजें (Save Data)';
+                    return;
+                }
+
+                if (result.status === 'success') {
+                    statusMessage.textContent = result.message || 'डेटा सफलतापूर्वक सहेजा गया!';
+                    statusMessage.className = 'success';
+                    productForm.reset();
+                    imagePreviewContainer.style.display = 'none';
+                    imagePreview.setAttribute('src', '#');
+                    imageUploadStatus.textContent = '';
+                } else {
+                    statusMessage.textContent = 'त्रुटि: ' + (result.message || 'अज्ञात त्रुटि');
+                    statusMessage.className = 'error';
+                }
+            } catch (error) {
+                console.error('Fetch error to Google Script:', error);
+                statusMessage.textContent = 'डेटा भेजने में त्रुटि: ' + error.message;
+                statusMessage.className = 'error';
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'डेटा सहेजें (Save Data)';
+            }
+        });
+    </script>
+</body>
+</html>
